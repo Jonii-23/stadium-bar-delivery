@@ -55,6 +55,50 @@ and costs nothing when idle, matching real match-day usage.
 
 🚧 In progress — WeThinkCode_ AWS elective project. Due 25 Sep 2026.
 
+## Local Development Setup
+
+### Python environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+### Run tests
+
+```bash
+pytest -q
+```
+
+### Common commands
+
+```bash
+make install
+make test
+make docker-build
+make docker-test
+```
+
+## Test Strategy
+
+This repo now includes a test-first structure for both unit and acceptance-style validation.
+
+- Unit tests cover business logic such as price calculations and input validation
+- Acceptance tests describe the expected lifecycle contract for order progression
+- Tests are intentionally built to run without AWS credentials by isolating DynamoDB access behind runtime setup
+
+## Container + CI
+
+The project includes a Docker image for local validation and GitHub Actions CI checks.
+
+```bash
+docker build -t stadium-bar-delivery .
+docker run --rm stadium-bar-delivery
+```
+
+The GitHub Actions workflow runs on pushes and pull requests and executes the pytest suite automatically.
+
 ## Repo Structure (planned)
 
 ```
