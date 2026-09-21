@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StadiumServe — Order</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>🍻 StadiumServe</h1>
+        <p>Order from your seat — no queueing</p>
+      </header>
+
+      <div class="card">
+        <label for="seatNumber">Seat Number</label>
+        <input id="seatNumber" type="text" placeholder="e.g. Block B, Row 4, Seat 12" required />
+
+        <label for="customerName">Your Name</label>
+        <input id="customerName" type="text" placeholder="e.g. Thando" required />
+
+        <label for="customerContact">Contact Number (optional)</label>
+        <input id="customerContact" type="text" placeholder="082 123 4567" />
+      </div>
+
+      <div class="card">
+        <label>Menu</label>
+        <div id="menuList"></div>
+        <div class="total-row">
+          <span>Total</span>
+          <span id="totalPrice">R0.00</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="notes">Notes (optional)</label>
+        <textarea id="notes" placeholder="e.g. no ice, extra napkins"></textarea>
+      </div>
+
+      <button id="submitBtn" class="submit" type="button">Place Order</button>
+      <div id="statusMsg" class="status-msg" aria-live="polite"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
