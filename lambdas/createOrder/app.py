@@ -7,8 +7,13 @@ import boto3
 
 TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(TABLE_NAME)
+table = None
+
+
+def get_table():
+    region_name = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
+    dynamodb = boto3.resource("dynamodb", region_name=region_name)
+    return dynamodb.Table(TABLE_NAME)
 
 
 def iso_utc_now():
@@ -94,7 +99,8 @@ def lambda_handler(event, context):
         "notes": body.get("notes"),
     }
 
-    table.put_item(Item=order)
+    db_table = table if table is not None else get_table()
+    db_table.put_item(Item=order)
 
     return {
         "statusCode": 201,

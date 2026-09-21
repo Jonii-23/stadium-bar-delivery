@@ -6,8 +6,14 @@ import boto3
 
 TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
 
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(TABLE_NAME)
+table = None
+
+
+def get_table():
+    region_name = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
+    dynamodb = boto3.resource("dynamodb", region_name=region_name)
+    return dynamodb.Table(TABLE_NAME)
+
 
 VALID_STATUSES = [
     "pending",
@@ -61,7 +67,9 @@ def lambda_handler(event, context):
             }),
         }
 
-    current_item = table.get_item(
+    db_table = table if table is not None else get_table()
+
+    current_item = db_table.get_item(
         Key={"PK": f"ORDER#{order_id}", "SK": "METADATA"}
     )
     current_record = current_item.get("Item")
@@ -105,7 +113,7 @@ def lambda_handler(event, context):
         update_expression += f", {field_name} = :{field_name}"
         expression_attribute_values[f":{field_name}"] = now
 
-    updated = table.update_item(
+    updated = db_table.update_item(
         Key={"PK": f"ORDER#{order_id}", "SK": "METADATA"},
         UpdateExpression=update_expression,
         ExpressionAttributeNames=expression_attribute_names,
