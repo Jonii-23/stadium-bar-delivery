@@ -55,3 +55,80 @@ def test_invalid_status_transition_is_rejected():
     update_module = load_module("update_order_status", "lambdas/updateOrderStatus/app.py")
 
     assert "delivered" not in update_module.TRANSITIONS["pending"]
+
+
+def test_create_order_publishes_bar_staff_notification(monkeypatch):
+    create_module = load_module("create_order", "lambdas/createOrder/app.py")
+
+    class FakeTable:
+        def put_item(self, Item):
+            pass
+
+    class FakeSNS:
+        def __init__(self):
+            self.published = []
+
+        def publish(self, TopicArn, Subject, Message, MessageAttributes=None):
+            self.published.append({
+                "TopicArn": TopicArn,
+                "Subject": Subject,
+                "Message": Message,
+                "MessageAttributes": MessageAttributes,
+            })
+            return {"MessageId": "abc-123"}
+
+    fake_table = FakeTable()
+    fake_sns = FakeSNS()
+    monkeypatch.setattr(create_module, "table", fake_table)
+    monkeypatch.setattr(create_module, "get_sns_client", lambda: fake_sns)
+    monkeypatch.setenv("BAR_STAFF_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:bar-staff")
+
+    event = {
+        "body": '{"customerId": "cust-123", "customerName": "Sipho M.", "seatNumber": "A12", "currency": "ZAR", "items": [{"name": "Castle Lager", "quantity": 2, "price": 45.0}]}'
+    }
+
+    response = create_module.lambda_handler(event, None)
+
+    assert response["statusCode"] == 201
+    assert fake_sns.published
+    assert fake_sns.published[0]["TopicArn"] == "arn:aws:sns:us-east-1:123456789012:bar-staff"
+    assert "New order received" in fake_sns.published[0]["Subject"]
+
+
+def test_status_update_publishes_ready_notification(monkeypatch):
+    update_module = load_module("update_order_status", "lambdas/updateOrderStatus/app.py")
+
+    class FakeTable:
+        def get_item(self, Key):
+            return {"Item": {"status": "preparing", "orderId": "ord-123"}}
+
+        def update_item(self, **kwargs):
+            return {"Attributes": {"status": "ready", "orderId": "ord-123"}}
+
+    class FakeSNS:
+        def __init__(self):
+            self.published = []
+
+        def publish(self, TopicArn, Subject, Message, MessageAttributes=None):
+            self.published.append({
+                "TopicArn": TopicArn,
+                "Subject": Subject,
+                "Message": Message,
+                "MessageAttributes": MessageAttributes,
+            })
+            return {"MessageId": "ready-123"}
+
+    fake_table = FakeTable()
+    fake_sns = FakeSNS()
+    monkeypatch.setattr(update_module, "table", fake_table)
+    monkeypatch.setattr(update_module, "get_sns_client", lambda: fake_sns)
+    monkeypatch.setenv("DELIVERY_STAFF_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:delivery-staff")
+
+    event = {"body": '{"orderId": "ord-123", "status": "ready"}'}
+
+    response = update_module.lambda_handler(event, None)
+
+    assert response["statusCode"] == 200
+    assert fake_sns.published
+    assert fake_sns.published[0]["TopicArn"] == "arn:aws:sns:us-east-1:123456789012:delivery-staff"
+    assert "ready" in fake_sns.published[0]["Message"]
