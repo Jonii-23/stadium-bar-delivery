@@ -9,10 +9,39 @@ TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
 table = None
 
 
+def get_region_name():
+    return os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
+
+
 def get_table():
-    region_name = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
-    dynamodb = boto3.resource("dynamodb", region_name=region_name)
+    dynamodb = boto3.resource("dynamodb", region_name=get_region_name())
     return dynamodb.Table(TABLE_NAME)
+
+
+def get_sns_client():
+    return boto3.client("sns", region_name=get_region_name())
+
+
+def publish_status_notification(order, new_status):
+    topic_arn = os.environ.get("DELIVERY_STAFF_TOPIC_ARN") if new_status == "ready" else None
+    if not topic_arn:
+        return
+
+    message = {
+        "event": "order_status_updated",
+        "orderId": order.get("orderId"),
+        "status": new_status,
+        "seatNumber": order.get("seatNumber"),
+        "customerName": order.get("customerName"),
+        "totalPrice": order.get("totalPrice"),
+        "currency": order.get("currency"),
+    }
+
+    get_sns_client().publish(
+        TopicArn=topic_arn,
+        Subject=f"Order status changed to {new_status}",
+        Message=json.dumps(message),
+    )
 
 
 VALID_STATUSES = [
@@ -121,11 +150,15 @@ def lambda_handler(event, context):
         ReturnValues="ALL_NEW",
     )
 
+    updated_order = updated.get("Attributes") or {}
+    if new_status == "ready":
+        publish_status_notification(updated_order, new_status)
+
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps({
             "message": "Order status updated successfully",
-            "order": updated.get("Attributes")
+            "order": updated_order
         }),
     }
