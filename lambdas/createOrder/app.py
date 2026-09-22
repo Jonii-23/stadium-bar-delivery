@@ -10,10 +10,40 @@ TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
 table = None
 
 
+def get_region_name():
+    return os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
+
+
 def get_table():
-    region_name = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION") or "us-east-1"
-    dynamodb = boto3.resource("dynamodb", region_name=region_name)
+    dynamodb = boto3.resource("dynamodb", region_name=get_region_name())
     return dynamodb.Table(TABLE_NAME)
+
+
+def get_sns_client():
+    return boto3.client("sns", region_name=get_region_name())
+
+
+def publish_order_notification(order):
+    topic_arn = os.environ.get("BAR_STAFF_TOPIC_ARN")
+    if not topic_arn:
+        return
+
+    message = {
+        "event": "order_created",
+        "orderId": order["orderId"],
+        "customerName": order["customerName"],
+        "seatNumber": order["seatNumber"],
+        "status": order["status"],
+        "totalPrice": order["totalPrice"],
+        "currency": order["currency"],
+        "items": order["items"],
+    }
+
+    get_sns_client().publish(
+        TopicArn=topic_arn,
+        Subject="New order received",
+        Message=json.dumps(message),
+    )
 
 
 def iso_utc_now():
@@ -101,6 +131,7 @@ def lambda_handler(event, context):
 
     db_table = table if table is not None else get_table()
     db_table.put_item(Item=order)
+    publish_order_notification(order)
 
     return {
         "statusCode": 201,
