@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: StadiumServe MVP infrastructure for orders, status updates, and delivery
+  notifications.
+Parameters:
+  OrdersTableName:
+    Type: String
+    Default: Orders
+    Description: DynamoDB table name for orders.
+Resources:
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName:
+        Ref: OrdersTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+      - AttributeName: PK
+        AttributeType: S
+      - AttributeName: SK
+        AttributeType: S
+      KeySchema:
+      - AttributeName: PK
+        KeyType: HASH
+      - AttributeName: SK
+        KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+  BarStaffTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: stadiumserve-bar-staff
+  DeliveryStaffTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: stadiumserve-delivery-staff
+  CreateOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CreateOrderFunction
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Environment:
+        Variables:
+          ORDERS_TABLE:
+            Ref: OrdersTableName
+          BAR_STAFF_TOPIC_ARN:
+            Ref: BarStaffTopic
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: OrdersTable
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - BarStaffTopic
+            - TopicName
+      Events:
+        CreateOrderApi:
+          Type: Api
+          Properties:
+            Path: /orders
+            Method: POST
+    Metadata:
+      SamResourceId: CreateOrderFunction
+  GetOrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: GetOrdersFunction
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Environment:
+        Variables:
+          ORDERS_TABLE:
+            Ref: OrdersTableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: OrdersTable
+      Events:
+        GetOrdersApi:
+          Type: Api
+          Properties:
+            Path: /orders
+            Method: GET
+    Metadata:
+      SamResourceId: GetOrdersFunction
+  UpdateOrderStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: UpdateOrderStatusFunction
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Environment:
+        Variables:
+          ORDERS_TABLE:
+            Ref: OrdersTableName
+          DELIVERY_STAFF_TOPIC_ARN:
+            Ref: DeliveryStaffTopic
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: OrdersTable
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - DeliveryStaffTopic
+            - TopicName
+      Events:
+        UpdateOrderStatusApi:
+          Type: Api
+          Properties:
+            Path: /orders/{orderId}/status
+            Method: PATCH
+    Metadata:
+      SamResourceId: UpdateOrderStatusFunction
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value:
+      Fn::Sub: https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/
+  OrdersTableName:
+    Description: DynamoDB orders table name
+    Value:
+      Ref: OrdersTable
+  BarStaffTopicArn:
+    Description: Bar staff SNS topic ARN
+    Value:
+      Ref: BarStaffTopic
+  DeliveryStaffTopicArn:
+    Description: Delivery staff SNS topic ARN
+    Value:
+      Ref: DeliveryStaffTopic
