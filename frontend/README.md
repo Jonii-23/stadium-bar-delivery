@@ -13,7 +13,7 @@ This directory contains the customer order interface for StadiumServe.
 Update the `API_BASE_URL` value in `app.js` before deployment:
 
 ```js
-const API_BASE_URL = "REPLACE_WITH_API_GATEWAY_URL";
+const API_BASE_URL = "https://<YOUR-API-ID>.execute-api.us-east-1.amazonaws.com/Prod";
 ```
 
 Once deployed, the page submits orders to:

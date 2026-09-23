@@ -1,4 +1,4 @@
-const API_BASE_URL = "REPLACE_WITH_API_GATEWAY_URL";
+const API_BASE_URL = "https://<YOUR-API-ID>.execute-api.us-east-1.amazonaws.com/Prod";
 
 const MENU = [
   { name: "Castle Lite", price: 45 },
@@ -102,7 +102,7 @@ submitBtn.addEventListener("click", async () => {
   statusMsgEl.className = "status-msg";
 
   try {
-    if (API_BASE_URL === "REPLACE_WITH_API_GATEWAY_URL") {
+    if (API_BASE_URL.includes("<YOUR-API-ID>")) {
       throw new Error("Set API_BASE_URL to your deployed API Gateway URL.");
     }
 
