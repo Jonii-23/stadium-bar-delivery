@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import boto3
 
@@ -34,9 +35,9 @@ def publish_order_notification(order):
         "customerName": order["customerName"],
         "seatNumber": order["seatNumber"],
         "status": order["status"],
-        "totalPrice": order["totalPrice"],
+        "totalPrice": float(order["totalPrice"]),
         "currency": order["currency"],
-        "items": order["items"],
+        "items": to_jsonable(order["items"]),
     }
 
     get_sns_client().publish(
@@ -48,6 +49,22 @@ def publish_order_notification(order):
 
 def iso_utc_now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def to_decimal(value):
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def to_jsonable(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, list):
+        return [to_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {key: to_jsonable(item) for key, item in value.items()}
+    return value
 
 
 def calculate_total(items):
@@ -102,7 +119,7 @@ def lambda_handler(event, context):
             "itemId": item.get("itemId") or str(uuid.uuid4()),
             "name": name,
             "quantity": quantity,
-            "price": price,
+            "price": to_decimal(price),
         })
 
     order_id = str(uuid.uuid4())
@@ -116,7 +133,7 @@ def lambda_handler(event, context):
         "seatNumber": seat_number,
         "status": "pending",
         "items": normalized_items,
-        "totalPrice": calculate_total(normalized_items),
+        "totalPrice": to_decimal(calculate_total(normalized_items)),
         "currency": body.get("currency", "ZAR"),
         "createdAt": now,
         "updatedAt": now,
@@ -138,6 +155,6 @@ def lambda_handler(event, context):
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps({
             "message": "Order created successfully",
-            "order": order,
+            "order": to_jsonable(order),
         }),
     }
