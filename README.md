@@ -55,6 +55,41 @@ and costs nothing when idle, matching real match-day usage.
 
 🚧 In progress — WeThinkCode_ AWS elective project. Due 25 Sep 2026.
 
+## Demo / How to Run
+
+The project is deployed and live in AWS.
+
+- Frontend: http://stadiumserve-frontend-493392056982-af-south-1.s3-website.af-south-1.amazonaws.com
+- API: https://3b8h4ahz3h.execute-api.af-south-1.amazonaws.com/Prod/
+
+### Quick demo steps
+
+1. Open the frontend URL in a browser.
+2. Enter a seat number, customer name, and at least one menu item.
+3. Click the "Place Order" button.
+4. The browser sends a POST request to the API and creates a new order with status `pending`.
+5. Refresh or query the orders endpoint to confirm the new record appears.
+
+### Example API test
+
+```bash
+curl -X POST "https://3b8h4ahz3h.execute-api.af-south-1.amazonaws.com/Prod/orders" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerId": "guest-demo-1",
+    "customerName": "Demo Guest",
+    "seatNumber": "A12",
+    "currency": "ZAR",
+    "items": [{"name": "Castle Lite", "quantity": 1, "price": 45}]
+  }'
+```
+
+Then fetch current orders:
+
+```bash
+curl "https://3b8h4ahz3h.execute-api.af-south-1.amazonaws.com/Prod/orders"
+```
+
 ## Local Development Setup
 
 ### Python environment
