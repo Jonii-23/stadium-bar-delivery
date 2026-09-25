@@ -7,8 +7,23 @@ from decimal import Decimal
 import boto3
 
 TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Content-Type": "application/json",
+}
 
 table = None
+
+
+def build_response(status_code, payload, extra_headers=None):
+    headers = CORS_HEADERS.copy()
+    if extra_headers:
+        headers.update(extra_headers)
+    return {
+        "statusCode": status_code,
+        "headers": headers,
+        "body": json.dumps(payload),
+    }
 
 
 def get_region_name():
@@ -80,11 +95,7 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Invalid JSON body"}),
-        }
+        return build_response(400, {"error": "Invalid JSON body"})
 
     customer_id = body.get("customerId", "guest")
     customer_name = (body.get("customerName") or "").strip()
@@ -92,13 +103,9 @@ def lambda_handler(event, context):
     items = body.get("items") or []
 
     if not customer_name or not seat_number or not items:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": "customerName, seatNumber and items are required"
-            }),
-        }
+        return build_response(400, {
+            "error": "customerName, seatNumber and items are required"
+        })
 
     normalized_items = []
     for item in items:
@@ -107,13 +114,9 @@ def lambda_handler(event, context):
         price = float(item.get("price", 0))
 
         if not name or quantity <= 0 or price < 0:
-            return {
-                "statusCode": 400,
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({
-                    "error": "Each item must include a valid name, quantity and price"
-                }),
-            }
+            return build_response(400, {
+                "error": "Each item must include a valid name, quantity and price"
+            })
 
         normalized_items.append({
             "itemId": item.get("itemId") or str(uuid.uuid4()),
@@ -150,11 +153,7 @@ def lambda_handler(event, context):
     db_table.put_item(Item=order)
     publish_order_notification(order)
 
-    return {
-        "statusCode": 201,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({
-            "message": "Order created successfully",
-            "order": to_jsonable(order),
-        }),
-    }
+    return build_response(201, {
+        "message": "Order created successfully",
+        "order": to_jsonable(order),
+    })

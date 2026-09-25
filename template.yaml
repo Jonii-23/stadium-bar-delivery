@@ -2,6 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: StadiumServe MVP infrastructure for orders, status updates, and delivery notifications.
 
+Globals:
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PATCH,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: "'*'"
+
 Parameters:
   OrdersTableName:
     Type: String

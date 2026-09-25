@@ -104,6 +104,49 @@ def test_get_orders_serializes_decimal_values_for_json(monkeypatch):
     assert "Decimal" not in payload
 
 
+def test_lambda_responses_include_cors_headers(monkeypatch):
+    create_module = load_module("create_order", "lambdas/createOrder/app.py")
+    get_module = load_module("get_orders", "lambdas/getOrders/app.py")
+    update_module = load_module("update_order_status", "lambdas/updateOrderStatus/app.py")
+
+    class FakeCreateTable:
+        def put_item(self, Item):
+            pass
+
+    class FakeCreateSNS:
+        def publish(self, TopicArn, Subject, Message):
+            return {"MessageId": "dummy"}
+
+    class FakeGetTable:
+        def scan(self, **kwargs):
+            return {"Items": []}
+
+    class FakeUpdateTable:
+        def get_item(self, Key):
+            return {"Item": {"status": "preparing", "orderId": "ord-123"}}
+
+        def update_item(self, **kwargs):
+            return {"Attributes": {"status": "ready", "orderId": "ord-123"}}
+
+    monkeypatch.setattr(create_module, "table", FakeCreateTable())
+    monkeypatch.setattr(create_module, "get_sns_client", lambda: FakeCreateSNS())
+    monkeypatch.setenv("BAR_STAFF_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:bar-staff")
+    create_response = create_module.lambda_handler({
+        "body": '{"customerId": "cust-123", "customerName": "Sipho M.", "seatNumber": "A12", "items": [{"name": "Castle Lager", "quantity": 1, "price": 45.0}]}'
+    }, None)
+    assert create_response["headers"]["Access-Control-Allow-Origin"] == "*"
+
+    monkeypatch.setattr(get_module, "table", FakeGetTable())
+    get_response = get_module.lambda_handler({"queryStringParameters": {}}, None)
+    assert get_response["headers"]["Access-Control-Allow-Origin"] == "*"
+
+    monkeypatch.setattr(update_module, "table", FakeUpdateTable())
+    monkeypatch.setattr(update_module, "get_sns_client", lambda: FakeCreateSNS())
+    monkeypatch.setenv("DELIVERY_STAFF_TOPIC_ARN", "arn:aws:sns:us-east-1:123456789012:delivery-staff")
+    update_response = update_module.lambda_handler({"body": '{"orderId": "ord-123", "status": "ready"}'}, None)
+    assert update_response["headers"]["Access-Control-Allow-Origin"] == "*"
+
+
 def test_invalid_status_transition_is_rejected():
     update_module = load_module("update_order_status", "lambdas/updateOrderStatus/app.py")
 

@@ -5,8 +5,23 @@ from datetime import datetime, timezone
 import boto3
 
 TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Content-Type": "application/json",
+}
 
 table = None
+
+
+def build_response(status_code, payload, extra_headers=None):
+    headers = CORS_HEADERS.copy()
+    if extra_headers:
+        headers.update(extra_headers)
+    return {
+        "statusCode": status_code,
+        "headers": headers,
+        "body": json.dumps(payload),
+    }
 
 
 def get_region_name():
@@ -69,32 +84,20 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Invalid JSON body"}),
-        }
+        return build_response(400, {"error": "Invalid JSON body"})
 
     order_id = body.get("orderId") or (event.get("pathParameters") or {}).get("orderId")
     new_status = (body.get("status") or "").strip()
 
     if not order_id or not new_status:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": "orderId and status are required"
-            }),
-        }
+        return build_response(400, {
+            "error": "orderId and status are required"
+        })
 
     if new_status not in VALID_STATUSES:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": f"Invalid status. Allowed values: {VALID_STATUSES}"
-            }),
-        }
+        return build_response(400, {
+            "error": f"Invalid status. Allowed values: {VALID_STATUSES}"
+        })
 
     db_table = table if table is not None else get_table()
 
@@ -104,23 +107,15 @@ def lambda_handler(event, context):
     current_record = current_item.get("Item")
 
     if not current_record:
-        return {
-            "statusCode": 404,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Order not found"}),
-        }
+        return build_response(404, {"error": "Order not found"})
 
     current_status = current_record.get("status", "pending")
     allowed_next = TRANSITIONS.get(current_status, [])
 
     if new_status not in allowed_next:
-        return {
-            "statusCode": 400,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({
-                "error": f"Invalid transition from {current_status} to {new_status}"
-            }),
-        }
+        return build_response(400, {
+            "error": f"Invalid transition from {current_status} to {new_status}"
+        })
 
     now = iso_utc_now()
     timestamp_fields = {
@@ -154,11 +149,7 @@ def lambda_handler(event, context):
     if new_status == "ready":
         publish_status_notification(updated_order, new_status)
 
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({
-            "message": "Order status updated successfully",
-            "order": updated_order
-        }),
-    }
+    return build_response(200, {
+        "message": "Order status updated successfully",
+        "order": updated_order,
+    })

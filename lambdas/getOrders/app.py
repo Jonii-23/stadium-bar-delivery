@@ -5,8 +5,23 @@ from decimal import Decimal
 import boto3
 
 TABLE_NAME = os.environ.get("ORDERS_TABLE", "Orders")
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Content-Type": "application/json",
+}
 
 table = None
+
+
+def build_response(status_code, payload, extra_headers=None):
+    headers = CORS_HEADERS.copy()
+    if extra_headers:
+        headers.update(extra_headers)
+    return {
+        "statusCode": status_code,
+        "headers": headers,
+        "body": json.dumps(payload),
+    }
 
 
 def get_table():
@@ -40,17 +55,9 @@ def lambda_handler(event, context):
         else:
             response = db_table.scan()
     except Exception as exc:
-        return {
-            "statusCode": 500,
-            "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": str(exc)}),
-        }
+        return build_response(500, {"error": str(exc)})
 
     items = response.get("Items", [])
     normalized_items = [decimal_to_float(item) for item in items]
 
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"items": normalized_items}),
-    }
+    return build_response(200, {"items": normalized_items})
