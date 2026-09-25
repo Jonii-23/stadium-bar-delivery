@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://<YOUR-API-ID>.execute-api.us-east-1.amazonaws.com/Prod";
+const API_BASE_URL = "https://3b8h4ahz3h.execute-api.af-south-1.amazonaws.com/Prod";
 
 const MENU = [
   { name: "Castle Lite", price: 45 },
