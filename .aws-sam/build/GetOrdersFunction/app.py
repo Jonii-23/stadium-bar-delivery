@@ -18,6 +18,10 @@ def get_table():
 def decimal_to_float(value):
     if isinstance(value, Decimal):
         return float(value)
+    if isinstance(value, list):
+        return [decimal_to_float(item) for item in value]
+    if isinstance(value, dict):
+        return {key: decimal_to_float(item) for key, item in value.items()}
     return value
 
 
@@ -43,11 +47,10 @@ def lambda_handler(event, context):
         }
 
     items = response.get("Items", [])
-    for item in items:
-        item["totalPrice"] = decimal_to_float(item.get("totalPrice"))
+    normalized_items = [decimal_to_float(item) for item in items]
 
     return {
         "statusCode": 200,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"items": items}),
+        "body": json.dumps({"items": normalized_items}),
     }
